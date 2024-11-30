@@ -16,12 +16,13 @@ mysql = dbConnect(RMySQL::MySQL(),
 pbp <- load_pbp(2020:2024)
 pbp$uid <- paste(pbp$game_id,pbp$play_id,sep="_")
 possession <- select(pbp,week,season,drive_time_of_possession,drive,posteam) %>% group_by(season,week,posteam,drive) %>% summarise(drive_time = max(drive_time_of_possession))
+possession <- filter(possession,!is.na(posteam) & ! is.na(drive))
 possession[c('min','sec')] <- str_split_fixed(possession$drive_time,':',2)
 possession$min <- as.numeric(as.character(possession$min))
 possession$sec <- as.numeric(as.character(possession$sec))
-possession$season_week <- (possession$season * 100) + week
 possession$secondsPossessed <- (possession$min * 60) + possession$sec
 possession <- group_by(possession, season,week,posteam) %>% summarize(time = sum(secondsPossessed))
+possession$season_week <- (possession$season * 100) + possession$week
 print(possession)
 pbp <- select(pbp,game_id,week,season,uid,yards_gained,td_player_id,interception,penalty,score_differential,fumble_forced,fumble_not_forced,fumble_lost,sack,touchdown,receiver_player_id,passer_player_id,rusher_player_id,interception_player_id,sack_player_id,half_sack_1_player_id,half_sack_2_player_id,penalty_player_id,penalty_yards)
 pbp$season_week <- (pbp$season * 100) + pbp$week
@@ -35,6 +36,7 @@ games <- load_schedules(2021:2024)
 games <- select(games,game_id,season,week,gameday,weekday,gametime,away_team,home_team,home_score,away_score,away_rest,home_rest,div_game,roof,surface,temp,wind,stadium_id)
 games$home_roster_id <- paste(games$season,games$week,games$home_team,sep="_") 
 games$away_roster_id <- paste(games$season,games$week,games$away_team,sep="_")
+games$home_win <- games$home_score > games$away_score
 games$season_week <- (games$season * 100) + games$week
 dbWriteTable(mysql,value = as.data.frame(games), name = "games", overwrite=TRUE)
 
@@ -62,7 +64,7 @@ for(row in 1:nrow(participation)){
 }
 dbWriteTable(mysql,value = as.data.frame(participation), name = "participation", overwrite=TRUE)
 
-fields <- list('AVG:yards_gained','AVG:touchdown','AVG:sack')
+fields <- list('AVG:yards_gained','AVG:touchdown','AVG:sack','AVG:penalty_yards','AVG:fumble_lost','AVG:interception')
 sides <- list('Offense','Defense')
 teams <- list('home','away')
 
