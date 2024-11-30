@@ -16,5 +16,5 @@ ALTER TABLE depth MODIFY club_code VARCHAR(3);
 ALTER TABLE depth MODIFY formation VARCHAR(20);
 ALTER TABLE `depth` ADD INDEX `query_index` (`season`,`week`,`club_code`,`depth_team`,`formation`);
 
-SELECT COUNT(*) FROM part_join;
+SELECT posteam,AVG(time) FROM poss WHERE season_week >= 202001 AND season_week < 202101 AND (posteam = 'TB' OR posteam = 'DAL') GROUP BY posteam;
 SELECT d.club_code,d.formation,AVG(pbp.yards_gained) AS yards_gained,SUM(pbp.touchdown) AS touchdown,SUM(pbp.sack) AS sack FROM depth as d JOIN part_join as j ON d.gsis_id = j.player JOIN pbp ON pbp.uid = j.play WHERE d.season = 2023 AND d.week = 13 AND (d.club_code = 'LA' OR d.club_code = 'CLE') AND d.depth_team < 3 AND (d.formation = 'Offense' OR d.formation = 'Defense') AND pbp.season_week >= 202309 AND pbp.season_week < 202313 AND ABS(pbp.score_differential) < 21 GROUP BY d.club_code, d.formation;

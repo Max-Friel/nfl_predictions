@@ -15,9 +15,18 @@ mysql = dbConnect(RMySQL::MySQL(),
 
 pbp <- load_pbp(2020:2024)
 pbp$uid <- paste(pbp$game_id,pbp$play_id,sep="_")
+possession <- select(pbp,week,season,drive_time_of_possession,drive,posteam) %>% group_by(season,week,posteam,drive) %>% summarise(drive_time = max(drive_time_of_possession))
+possession[c('min','sec')] <- str_split_fixed(possession$drive_time,':',2)
+possession$min <- as.numeric(as.character(possession$min))
+possession$sec <- as.numeric(as.character(possession$sec))
+possession$season_week <- (possession$season * 100) + week
+possession$secondsPossessed <- (possession$min * 60) + possession$sec
+possession <- group_by(possession, season,week,posteam) %>% summarize(time = sum(secondsPossessed))
+print(possession)
 pbp <- select(pbp,game_id,week,season,uid,yards_gained,td_player_id,interception,penalty,score_differential,fumble_forced,fumble_not_forced,fumble_lost,sack,touchdown,receiver_player_id,passer_player_id,rusher_player_id,interception_player_id,sack_player_id,half_sack_1_player_id,half_sack_2_player_id,penalty_player_id,penalty_yards)
 pbp$season_week <- (pbp$season * 100) + pbp$week
 dbWriteTable(mysql,value = as.data.frame(pbp), name = "pbp", overwrite=TRUE)
+dbWriteTable(mysql,value = as.data.frame(possession), name = "poss", overwrite=TRUE)
 
 teams <- load_teams()
 dbWriteTable(mysql,value = as.data.frame(teams), name = "teams", overwrite=TRUE)
@@ -75,6 +84,18 @@ get_query <- function(season,week,weeks_back,home_team,away_team){
   query <- paste0(query,' FROM depth as d JOIN part_join as j ON d.gsis_id = j.player JOIN pbp ON pbp.uid = j.play WHERE d.season = ',season,' AND d.week = ',week,' AND (d.club_code = \'',home_team,'\' OR d.club_code = \'',away_team,'\') AND d.depth_team < 3 AND (d.formation = \'Offense\' OR d.formation = \'Defense\') AND pbp.season_week >= ',((season_back)*100) + prev_week,' AND pbp.season_week < ',((season)*100) + week,' AND ABS(pbp.score_differential) < 21 GROUP BY d.club_code, d.formation;')
   print(query)
 }
+
+get_query_top <- function(season,week,weeks_back,home_team,away_team){
+  prev_week = week - weeks_back
+  season_back = season
+  while(prev_week < 0){
+    prev_week = prev_week + 17
+    season_back = season_back - 1
+  }
+  query <- paste0('SELECT posteam,AVG(time) as time FROM poss WHERE season_week >= ',((season_back)*100) + prev_week,' AND season_week < ',((season)*100) + week,' AND (posteam = \'',home_team,'\' OR posteam = \'',away_team,'\') GROUP BY posteam;')
+  print(query)
+}
+
 #run indexes before running this
 newColumnYear <- list()
 newColumn4 <- list()
@@ -93,6 +114,14 @@ for(row in 1:nrow(testGames)){
   query4 <- get_query(season,week,4,home_team,away_team)
   rs4 <- dbSendQuery(mysql,query4)
   res4 <- fetch(rs4,n=-1)
+  
+  queryYearTop <- get_query_top(season,week,17,home_team,away_team)
+  rsYearTop <- dbSendQuery(mysql,queryYearTop)
+  resYearTop <- fetch(rsYearTop,n=-1)
+  
+  query4Top <- get_query_top(season,week,4,home_team,away_team)
+  rs4Top <- dbSendQuery(mysql,query4Top)
+  res4Top <- fetch(rs4Top,n=-1)
   
   i = 1
   for(team in teams){
@@ -113,11 +142,21 @@ for(row in 1:nrow(testGames)){
           
           val4 <- filter(res4,club_code == t & formation == side)[1,fld]
           newColumn4[[i]] <- append(newColumn4[[i]],val4)
-          
           i = i + 1
         }
+        if(i > length(newColumnYear)){
+          newColumnYear[[i]] <- vector()
+          newColumn4[[i]] <- vector()
+        }
+        
       }
     }
+    valYear <- filter(resYearTop,posteam == t)[1,"time"]
+    newColumnYear[[i]] <- append(newColumnYear[[i]],valYear)
+    
+    val4 <- filter(res4Top,posteam == t)[1,"time"]
+    newColumn4[[i]] <- append(newColumn4[[i]],val4)
+    i = i + 1
   }
 }
 
@@ -135,7 +174,14 @@ for(team in teams){
         testGames[fld_name] <- newColumn4[[i]]
         i = i + 1
       }
+      
     }
   }
+  fld_name <- paste0('pastYear_',team,'_top')
+  testGames[fld_name] <- newColumnYear[[i]]
+
+  fld_name <- paste0('past4_',team,'_top')
+  testGames[fld_name] <- newColumn4[[i]]
+  i = i + 1
 }
 write.csv(testGames,"C:\\Users\\Max\\Documents\\nfl_predictions\\data\\games.csv")
