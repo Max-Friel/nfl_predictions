@@ -33,10 +33,11 @@ teams <- load_teams()
 dbWriteTable(mysql,value = as.data.frame(teams), name = "teams", overwrite=TRUE)
 
 games <- load_schedules(2021:2024)
-games <- select(games,game_id,season,week,gameday,weekday,gametime,away_team,home_team,home_score,away_score,away_rest,home_rest,div_game,roof,surface,temp,wind,stadium_id)
+games <- select(games,spread_line,game_id,season,week,gameday,weekday,gametime,away_team,home_team,home_score,away_score,away_rest,home_rest,div_game,roof,surface,temp,wind,stadium_id)
 games$home_roster_id <- paste(games$season,games$week,games$home_team,sep="_") 
 games$away_roster_id <- paste(games$season,games$week,games$away_team,sep="_")
 games$home_win <- games$home_score > games$away_score
+games$home_win_spread <- games$home_score > (games$away_score + games$spread_line)
 games$season_week <- (games$season * 100) + games$week
 dbWriteTable(mysql,value = as.data.frame(games), name = "games", overwrite=TRUE)
 
@@ -68,7 +69,7 @@ fields <- list('AVG:yards_gained','AVG:touchdown','AVG:sack','AVG:penalty_yards'
 sides <- list('Offense','Defense')
 teams <- list('home','away')
 
-testGames <- games
+
 
 get_query <- function(season,week,weeks_back,home_team,away_team){
   query <- paste0('SELECT d.club_code,d.formation')
@@ -97,6 +98,8 @@ get_query_top <- function(season,week,weeks_back,home_team,away_team){
   query <- paste0('SELECT posteam,AVG(time) as time FROM poss WHERE season_week >= ',((season_back)*100) + prev_week,' AND season_week < ',((season)*100) + week,' AND (posteam = \'',home_team,'\' OR posteam = \'',away_team,'\') GROUP BY posteam;')
   print(query)
 }
+
+testGames <- filter(games,season_week <= 202414)
 
 #run indexes before running this
 newColumnYear <- list()

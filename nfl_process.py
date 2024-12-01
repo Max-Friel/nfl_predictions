@@ -10,6 +10,15 @@ def zscore(data,data2):
     s = np.std(data,ddof=1)
     return (data-m)/s,(data2-m)/s
 
+def onehot(data,name):
+    values = list(set(data))
+    arrRet = np.zeros(shape=(len(data),len(values)))
+    for x in range(0,len(data)):
+        for y in range(0,len(values)):
+            arrRet[x,y] = values[y] == data[x]
+    values = np.char.add(name + "_", values)
+    return values,arrRet
+
 def trainingSplit(data):
     np.random.shuffle(data)
     trainingIndex = int(len(data)/3)
@@ -17,14 +26,85 @@ def trainingSplit(data):
     validationData = data[(len(data) - trainingIndex):,:]
     return trainingData,validationData
 
+def rmse(y,yHat):
+	return np.sqrt(np.mean((yHat-y)**2))
+
+def smape(y,yHat):
+	return np.mean(np.abs(y-yHat)/(np.abs(y) + np.abs(yHat)))
+
 def getFieldIndex(header,fld):
       return np.where(header == (fld))[0][0]
+
+def linreg(training,validation,headers,flds,c):
+    cols = []
+    for fld in flds:
+        cols.append(getFieldIndex(headers,fld))
+    cI = getFieldIndex(headers,c)
+    X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
+    Y = training[:,cI].astype(float)
+    w = np.linalg.pinv(X.T@X)@X.T@Y
+    train = X@w
+    print("RMSE Training:" + str(rmse(Y,train)))
+    print("SMAPE Training:" + str(smape(Y,train)))
+    X = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
+    Y = validation[:,cI].astype(float)
+    yHat = X@w
+    print("RMSE Validation:" + str(rmse(Y,yHat)))
+    print("SMAPE Validation:" + str(smape(Y,yHat)))
+    return yHat
+
+def knn(trainingData,validationData,flds,c,K):
+    goalIndex = getFieldIndex(headers,c)
+    right = 0
+    results = []
+    for i in range(0,validationData.shape[0]):
+        kClosest = []
+        kClosestClass = []
+        for p in range(0,trainingData.shape[0]):
+            distance = 0
+            for fld in flds:
+                fldI = getFieldIndex(headers,fld)
+                distance += (validationData[i,fldI].astype(float) - trainingData[p,fldI].astype(float))**2
+            distance = distance ** 0.5
+            for k in range(0,K):
+                if len(kClosest) == k or kClosest[k] > distance:
+                    kClosest.insert(k,distance)
+                    kClosestClass.insert(k,trainingData[p,goalIndex])
+                    break
+            if len(kClosest) > K:
+                kClosest.pop()
+                kClosestClass.pop()
+        counter = Counter(kClosestClass)
+        predict = counter.most_common(1)[0][0]
+        results.append(predict)
+        confidence = counter[predict] / 5
+        actual = validationData[i,goalIndex]
+        if predict == actual:
+            right += 1
+    print(f"Acuracy:{right/validationData.shape[0]}")
+    return results
 
 #loading in data and splitting it
 csv = np.loadtxt('./data/games.csv',dtype=str,delimiter=",")
 np.random.seed(0)
 headers = csv[0,:]
+home_score_col = getFieldIndex(headers,"home_score")
+away_score_col = getFieldIndex(headers,"away_score")
 data = csv[1:,:]
+data = data[data[:,home_score_col] != "NA"]
+data = data[data[:,away_score_col] != "NA"]
+
+oneHotFields = ["weekday","gametime","roof","surface","stadium"]
+oneHotFieldsAfter = {}
+for fld in oneHotFields:
+    col = getFieldIndex(headers,fld)
+    newHeaders,newData = onehot(data[:,col],fld)
+    headers = np.delete(headers,col)
+    headers = np.append(headers,newHeaders)
+    data = np.delete(data,col,axis=1)
+    data = np.hstack((data,newData))
+    oneHotFieldsAfter[fld] = newHeaders
+
 trainingData, validationData = trainingSplit(data)
 
 #zscore required fields
@@ -33,38 +113,20 @@ for fld in zscoreFields:
     i = getFieldIndex(headers,fld)
     trainingData[:,i],validationData[:,i] = zscore(trainingData[:,i],validationData[:,i])
 
-#run KNN based on only scored fields
-K = 3
-goalIndex = getFieldIndex(headers,"home_win")
-right = 0
-right100 = 0
-total100 = 0
+#run KNN based on only zscored fields
+knn(trainingData,validationData,zscoreFields,"home_win",5)
+
+#run LinReg
+validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"home_score")))
+validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"away_score")))
+hwI = getFieldIndex(headers,"home_win")
+right = 0;
 for i in range(0,validationData.shape[0]):
-    kClosest = []
-    kClosestClass = []
-    for p in range(0,trainingData.shape[0]):
-        distance = 0
-        for fld in zscoreFields:
-            fldI = getFieldIndex(headers,fld)
-            distance += (validationData[i,fldI].astype(float) - trainingData[p,fldI].astype(float))**2
-        distance = distance ** 0.5
-        for k in range(0,K):
-            if len(kClosest) == k or kClosest[k] > distance:
-                kClosest.insert(k,distance)
-                kClosestClass.insert(k,trainingData[p,goalIndex])
-                break
-        if len(kClosest) > K:
-            kClosest.pop()
-            kClosestClass.pop()
-    counter = Counter(kClosestClass)
-    predict = counter.most_common(1)[0][0]
-    confidence = counter[predict] / 5
-    actual = validationData[i,goalIndex]
-    if confidence == 1:
-        total100 +=1
-        if predict == actual:
-            right100 += 1
-    if predict == actual:
+    home = validationData[i,-2]
+    away = validationData[i,-1]
+    home_win = validationData[i,hwI] == "TRUE"
+    home_win_pred = home > away
+    if home_win == home_win_pred:
          right += 1
-print(f"Acuracy:{right/validationData.shape[0]}")
-print(f"Acuracy100:{right100/total100}")
+    print(f"home:{home} away:{away} pred:{home_win_pred} actual:{home_win}")
+print(f"right:{right} size:{validationData.shape[0]} %:{right/validationData.shape[0]}")
