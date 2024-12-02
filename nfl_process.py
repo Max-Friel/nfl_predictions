@@ -33,7 +33,7 @@ def smape(y,yHat):
 	return np.mean(np.abs(y-yHat)/(np.abs(y) + np.abs(yHat)))
 
 def getFieldIndex(header,fld):
-      return np.where(header == (fld))[0][0]
+      return np.where(header == ('"' + fld + '"'))[0][0]
 
 def linreg(training,validation,headers,flds,c):
     cols = []
@@ -94,7 +94,7 @@ data = csv[1:,:]
 data = data[data[:,home_score_col] != "NA"]
 data = data[data[:,away_score_col] != "NA"]
 
-oneHotFields = ["weekday","gametime","roof","surface","stadium"]
+oneHotFields = ["weekday","gametime","roof","surface","stadium_id"]
 oneHotFieldsAfter = {}
 for fld in oneHotFields:
     col = getFieldIndex(headers,fld)
@@ -108,25 +108,25 @@ for fld in oneHotFields:
 trainingData, validationData = trainingSplit(data)
 
 #zscore required fields
-zscoreFields = ["home_rest","away_rest","pastYear_home_Offense_yards_gained","past4_home_Offense_yards_gained","pastYear_home_Offense_touchdown","past4_home_Offense_touchdown","pastYear_home_Offense_sack","past4_home_Offense_sack","pastYear_home_Defense_yards_gained","past4_home_Defense_yards_gained","pastYear_home_Defense_touchdown","past4_home_Defense_touchdown","pastYear_home_Defense_sack","past4_home_Defense_sack","pastYear_home_top","past4_home_top","pastYear_away_Offense_yards_gained","past4_away_Offense_yards_gained","pastYear_away_Offense_touchdown","past4_away_Offense_touchdown","pastYear_away_Offense_sack","past4_away_Offense_sack","pastYear_away_Defense_yards_gained","past4_away_Defense_yards_gained","pastYear_away_Defense_touchdown","past4_away_Defense_touchdown","pastYear_away_Defense_sack","past4_away_Defense_sack","pastYear_away_top","past4_away_top"]
+zscoreFields = ["home_rest","away_rest","pastYear_home_Offense_yards_gained","past4_home_Offense_yards_gained","pastYear_home_Offense_touchdown","past4_home_Offense_touchdown","pastYear_home_Offense_sack","past4_home_Offense_sack","pastYear_home_Offense_penalty_yards","past4_home_Offense_penalty_yards","pastYear_home_Offense_fumble_lost","past4_home_Offense_fumble_lost","pastYear_home_Offense_interception","past4_home_Offense_interception","pastYear_home_Defense_yards_gained","past4_home_Defense_yards_gained","pastYear_home_Defense_touchdown","past4_home_Defense_touchdown","pastYear_home_Defense_sack","past4_home_Defense_sack","pastYear_home_Defense_penalty_yards","past4_home_Defense_penalty_yards","pastYear_home_Defense_fumble_lost","past4_home_Defense_fumble_lost","pastYear_home_Defense_interception","past4_home_Defense_interception","pastYear_home_top","past4_home_top","pastYear_away_Offense_yards_gained","past4_away_Offense_yards_gained","pastYear_away_Offense_touchdown","past4_away_Offense_touchdown","pastYear_away_Offense_sack","past4_away_Offense_sack","pastYear_away_Offense_penalty_yards","past4_away_Offense_penalty_yards","pastYear_away_Offense_fumble_lost","past4_away_Offense_fumble_lost","pastYear_away_Offense_interception","past4_away_Offense_interception","pastYear_away_Defense_yards_gained","past4_away_Defense_yards_gained","pastYear_away_Defense_touchdown","past4_away_Defense_touchdown","pastYear_away_Defense_sack","past4_away_Defense_sack","pastYear_away_Defense_penalty_yards","past4_away_Defense_penalty_yards","pastYear_away_Defense_fumble_lost","past4_away_Defense_fumble_lost","pastYear_away_Defense_interception","past4_away_Defense_interception","pastYear_away_top","past4_away_top"]
 for fld in zscoreFields:
     i = getFieldIndex(headers,fld)
     trainingData[:,i],validationData[:,i] = zscore(trainingData[:,i],validationData[:,i])
 
 #run KNN based on only zscored fields
-knn(trainingData,validationData,zscoreFields,"home_win",5)
+knn(trainingData,validationData,zscoreFields,"home_win_spread",10)
 
 #run LinReg
 validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"home_score")))
 validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"away_score")))
-hwI = getFieldIndex(headers,"home_win")
+hwI = getFieldIndex(headers,"home_win_spread")
+spreadI = getFieldIndex(headers,"spread_line")
 right = 0;
 for i in range(0,validationData.shape[0]):
-    home = validationData[i,-2]
-    away = validationData[i,-1]
+    home = validationData[i,-2].astype(float)
+    away = validationData[i,-1].astype(float)
     home_win = validationData[i,hwI] == "TRUE"
-    home_win_pred = home > away
+    home_win_pred = home > (away + validationData[i,spreadI].astype(float)) 
     if home_win == home_win_pred:
          right += 1
-    print(f"home:{home} away:{away} pred:{home_win_pred} actual:{home_win}")
 print(f"right:{right} size:{validationData.shape[0]} %:{right/validationData.shape[0]}")
