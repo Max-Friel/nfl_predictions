@@ -35,6 +35,66 @@ def smape(y,yHat):
 def getFieldIndex(header,fld):
       return np.where(header == ('"' + fld + '"'))[0][0]
 
+def diag(X):
+    xDiag = np.zeros((X.shape[0],X.shape[0]),int)
+    np.fill_diagonal(xDiag,X)
+    return xDiag
+
+def linregstats(Y,yHat):
+    print("RMSE Training:" + str(rmse(Y,yHat)))
+    print("SMAPE Training:" + str(smape(Y,yHat)))
+
+def svmstats(yHat,Y):
+    correct = 0
+    tp = 0
+    fp = 0
+    tn = 0
+    fn = 0
+    p = 0
+    n = 0
+    yAbs = np.abs(yHat)
+    res = np.hstack((np.where(yHat > 0, 1,-1),np.atleast_2d(Y).T,(np.where(yAbs > .5,1,0))))
+    #res = res[res[:,2] == 1]
+    tp = np.sum((res[:,0] == 1) & (res[:,1] == 1))
+    fp = np.sum((res[:,0] == 1) & (res[:,1] == -1))
+    tn = np.sum((res[:,0] == -1) & (res[:,1] == 1))
+    fn = np.sum((res[:,0] == -1) & (res[:,1] == 1))
+    correct = np.sum(res[:,0] == res[:,1])
+    n = np.sum(res[:,1] == -1)
+    p = np.sum(res[:,1] == 1)
+    precision = tp/(tp+fp)
+    recall = tp / (tp + fn)
+    fMeasure = (2*precision*recall)/(precision+recall)
+    print(f"Class priors 1:{p/res.shape[0]} 0:{n/res.shape[0]}")
+    print(f"Accuracy: {correct/res.shape[0]}")
+    print(f"Precison: {precision}")
+    print(f"Recall: {recall}")
+    print(f"FMeasure: {fMeasure}")
+
+def alpha(X,Y):
+    yDiag = diag(Y)
+    ones = np.ones((X.shape[0],1))
+    return np.linalg.pinv(yDiag@X@X.T@yDiag)@ones
+
+def svm(training,validation,headers,flds,c):
+    cols = []
+    for fld in flds:
+        cols.append(getFieldIndex(headers,fld))
+    cI = getFieldIndex(headers,c)
+    X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
+    Y = np.where(training[:,cI] == 'TRUE',1,-1)
+    a = alpha(X,Y)
+    w = X.T@diag(Y)@a
+    yHat = X@w
+    print("Training")
+    svmstats(yHat,Y)
+    print()
+    X = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
+    Y = np.where(validation[:,cI] == 'TRUE',1,-1)
+    yHat = X@w
+    print("Validation")
+    svmstats(yHat,Y)
+
 def linreg(training,validation,headers,flds,c):
     cols = []
     for fld in flds:
@@ -43,14 +103,15 @@ def linreg(training,validation,headers,flds,c):
     X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
     Y = training[:,cI].astype(float)
     w = np.linalg.pinv(X.T@X)@X.T@Y
+    print(np.column_stack((flds,w[1:,])))
     train = X@w
-    print("RMSE Training:" + str(rmse(Y,train)))
-    print("SMAPE Training:" + str(smape(Y,train)))
+    print("Training LinReg:")
+    linregstats(Y,train)
     X = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
     Y = validation[:,cI].astype(float)
     yHat = X@w
-    print("RMSE Validation:" + str(rmse(Y,yHat)))
-    print("SMAPE Validation:" + str(smape(Y,yHat)))
+    print("Validation LinReg:")
+    linregstats(Y,yHat)
     return yHat
 
 def knn(trainingData,validationData,flds,c,K):
@@ -114,19 +175,24 @@ for fld in zscoreFields:
     trainingData[:,i],validationData[:,i] = zscore(trainingData[:,i],validationData[:,i])
 
 #run KNN based on only zscored fields
-knn(trainingData,validationData,zscoreFields,"home_win_spread",10)
+#knn(trainingData,validationData,zscoreFields,"home_win_spread",10)
 
 #run LinReg
 validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"home_score")))
 validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"away_score")))
 hwI = getFieldIndex(headers,"home_win_spread")
 spreadI = getFieldIndex(headers,"spread_line")
-right = 0;
-for i in range(0,validationData.shape[0]):
-    home = validationData[i,-2].astype(float)
-    away = validationData[i,-1].astype(float)
-    home_win = validationData[i,hwI] == "TRUE"
-    home_win_pred = home > (away + validationData[i,spreadI].astype(float)) 
-    if home_win == home_win_pred:
-         right += 1
+
+validationData = np.column_stack((validationData,validationData[:,-2].astype(float)-(validationData[:,-1].astype(float) + validationData[:,spreadI].astype(float))))
+validationData = np.column_stack((validationData,np.where(validationData[:,-1].astype(float) > 0,"TRUE","FALSE")))
+#validationData = validationData[np.abs(validationData[:,-2].astype(float)) > 3]
+right = np.sum(validationData[:,-1] == validationData[:,hwI])
 print(f"right:{right} size:{validationData.shape[0]} %:{right/validationData.shape[0]}")
+for i in range(1,np.max(validationData[:,-2].astype(float)).astype(int)):
+    print(f"i:{i}")
+    d = validationData[np.abs(validationData[:,-2].astype(float)) > i]
+    right = np.sum(d[:,-1] == d[:,hwI])
+    print(f"right:{right} size:{d.shape[0]} %:{right/d.shape[0]}")
+
+#run SVM
+svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")
