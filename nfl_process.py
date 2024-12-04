@@ -94,6 +94,11 @@ def svm(training,validation,headers,flds,c):
     yHat = X@w
     print("Validation")
     svmstats(yHat,Y)
+    return np.where(yHat > 0,"TRUE","FALSE")
+
+def logreg(training,validation,headers,flds,c):
+    #needs code filled in
+    return np.full((validationData.shape[0],1),"TRUE")
 
 def linreg(training,validation,headers,flds,c):
     cols = []
@@ -147,6 +152,7 @@ def knn(trainingData,validationData,flds,c,K):
 
 #loading in data and splitting it
 csv = np.loadtxt('./data/games.csv',dtype=str,delimiter=",")
+
 np.random.seed(0)
 headers = csv[0,:]
 home_score_col = getFieldIndex(headers,"home_score")
@@ -195,4 +201,14 @@ for i in range(1,np.max(validationData[:,-2].astype(float)).astype(int)):
     print(f"right:{right} size:{d.shape[0]} %:{right/d.shape[0]}")
 
 #run SVM
-svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")
+validationData = np.column_stack((validationData,svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
+
+#run LogReg
+validationData = np.column_stack((validationData,logreg(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
+
+#creates a result 2d array where 
+#column 1 is the linear regression result
+#column 2 is the SVM result
+#column 3 is the logisitical regression result with 
+#column 4 being the actual result 
+results = np.column_stack((validationData[:,-3:],validationData[:,hwI]))
