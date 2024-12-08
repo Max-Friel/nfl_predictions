@@ -269,3 +269,104 @@ validationData = np.column_stack((validationData,logreg(trainingData,validationD
 #column 3 is the logisitical regression result with 
 #column 4 being the actual result 
 results = np.column_stack((validationData[:,-3:],validationData[:,hwI]))
+
+
+### Ensemble Bagging Method
+
+# Convert 'TRUE'/'FALSE' to 1/0
+bg_results = np.where(results == 'TRUE', 1, 0).astype(int)
+
+X = bg_results[:, :3]  
+y_class = bg_results[:, 3]
+y_reg = bg_results[:, 3].astype(float)
+
+split_index = int(0.7 * len(X))  
+X_train, X_test = X[:split_index], X[split_index:]
+y_class_train, y_class_test = y_class[:split_index], y_class[split_index:]
+y_regr_train, y_regr_test = y_reg[:split_index], y_reg[split_index:]
+
+# Bagging for Classification
+num_models = 10
+classification_predictions = []
+
+for _ in range(num_models):
+    indices = np.random.choice(len(X_train), len(X_train), replace=True)
+    X_sample, y_sample = X_train[indices], y_class_train[indices]
+    
+    majority_class = Counter(y_sample).most_common(1)[0][0]
+    model_prediction = [majority_class] * len(X_test)
+    classification_predictions.append(model_prediction)
+
+final_classification_prediction = np.round(np.mean(classification_predictions, axis=0)).astype(int)
+classification_accuracy = np.mean(final_classification_prediction == y_class_test)
+
+regression_predictions = []
+
+for _ in range(num_models):
+    indices = np.random.choice(len(X_train), len(X_train), replace=True)
+    X_sample, y_sample = X_train[indices], y_regr_train[indices]
+    
+    model_prediction = [np.mean(y_sample)] * len(X_test)
+    regression_predictions.append(model_prediction)
+
+final_regression_prediction = np.mean(regression_predictions, axis=0)
+regression_mse = np.mean((final_regression_prediction - y_regr_test) ** 2)
+
+# Output results
+print("BAGGING - Classification Accuracy:", classification_accuracy)
+print("BAGGING - Regression Mean Squared Error (MSE):", regression_mse)
+
+
+###Ensemble Random Forests Method
+# Convert 'TRUE'/'FALSE' to 1/0
+rf_results = np.where(results == 'TRUE', 1, 0).astype(int)
+
+X = rf_results[:, :3]  
+y_class = rf_results[:, 3]  
+y_reg = rf_results[:, 3].astype(float) 
+
+split_index = int(0.7 * len(X)) 
+X_train, X_test = X[:split_index], X[split_index:]
+y_class_train, y_class_test = y_class[:split_index], y_class[split_index:]
+y_regr_train, y_regr_test = y_reg[:split_index], y_reg[split_index:]
+
+# Random Forests for Classification
+num_trees = 10
+max_features = 2 
+classification_predictions = []
+
+for _ in range(num_trees):
+    indices = np.random.choice(len(X_train), len(X_train), replace=True)
+    X_sample, y_sample = X_train[indices], y_class_train[indices]
+    
+    selected_features = np.random.choice(X_sample.shape[1], max_features, replace=False)
+    X_sample_reduced = X_sample[:, selected_features]
+    X_test_reduced = X_test[:, selected_features]
+    
+    majority_class = Counter(y_sample).most_common(1)[0][0]
+    model_prediction = [majority_class] * len(X_test_reduced)
+    classification_predictions.append(model_prediction)
+
+final_classification_prediction = np.round(np.mean(classification_predictions, axis=0)).astype(int)
+classification_accuracy = np.mean(final_classification_prediction == y_class_test)
+
+# Random Forests for Regression
+regression_predictions = []
+
+for _ in range(num_trees):
+    indices = np.random.choice(len(X_train), len(X_train), replace=True)
+    X_sample, y_sample = X_train[indices], y_regr_train[indices]
+    
+    selected_features = np.random.choice(X_sample.shape[1], max_features, replace=False)
+    X_sample_reduced = X_sample[:, selected_features]
+    X_test_reduced = X_test[:, selected_features]
+    
+    model_prediction = [np.mean(y_sample)] * len(X_test_reduced)
+    regression_predictions.append(model_prediction)
+
+final_regression_prediction = np.mean(regression_predictions, axis=0)
+regression_mse = np.mean((final_regression_prediction - y_regr_test) ** 2)
+
+# Output results
+print("RANDOM FOREST - Classification Accuracy:", classification_accuracy)
+print("RANDOM FOREST - Regression Mean Squared Error (MSE):", regression_mse)
