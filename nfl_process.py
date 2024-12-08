@@ -71,10 +71,13 @@ def svmstats(yHat,Y):
     print(f"Recall: {recall}")
     print(f"FMeasure: {fMeasure}")
 
-def alpha(X,Y):
+def alpha(X,Y,k):
     yDiag = diag(Y)
     ones = np.ones((X.shape[0],1))
-    return np.linalg.pinv(yDiag@X@X.T@yDiag)@ones
+    return np.linalg.pinv(yDiag@k(X,X)@yDiag)@ones
+
+def k(a,b):
+    return a@b.T
 
 def svm(training,validation,headers,flds,c):
     cols = []
@@ -83,7 +86,7 @@ def svm(training,validation,headers,flds,c):
     cI = getFieldIndex(headers,c)
     X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
     Y = np.where(training[:,cI] == 'TRUE',1,-1)
-    a = alpha(X,Y)
+    a = alpha(X,Y,k)
     w = X.T@diag(Y)@a
     yHat = X@w
     print("Training")
@@ -94,6 +97,31 @@ def svm(training,validation,headers,flds,c):
     yHat = X@w
     print("Validation")
     svmstats(yHat,Y)
+    return np.where(yHat > 0,"TRUE","FALSE")
+
+
+
+def kernel(a,b):
+    return ((a@b.T) + 1)**2
+
+def svmk(training,validation,headers,flds,c):
+    cols = []
+    for fld in flds:
+        cols.append(getFieldIndex(headers,fld))
+    cI = getFieldIndex(headers,c)
+    X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
+    Y = np.where(training[:,cI] == 'TRUE',1,-1)
+    a = alpha(X,Y,kernel)
+    w = X.T@diag(Y)@a
+    yHat = kernel(X,X)@diag(Y)@a
+    print("Training")
+    svmstats(yHat,Y)
+    print()
+    X2 = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
+    Y2 = np.where(validation[:,cI] == 'TRUE',1,-1)
+    yHat = kernel(X2,X)@diag(Y)@a
+    print("Validation")
+    svmstats(yHat,Y2)
     return np.where(yHat > 0,"TRUE","FALSE")
 
 def logreg(training,validation,headers,flds,c):
@@ -108,7 +136,6 @@ def linreg(training,validation,headers,flds,c):
     X = np.column_stack((np.ones((training.shape[0],1)),training[:,cols])).astype(float)
     Y = training[:,cI].astype(float)
     w = np.linalg.pinv(X.T@X)@X.T@Y
-    print(np.column_stack((flds,w[1:,])))
     train = X@w
     print("Training LinReg:")
     linregstats(Y,train)
@@ -191,6 +218,7 @@ spreadI = getFieldIndex(headers,"spread_line")
 
 validationData = np.column_stack((validationData,validationData[:,-2].astype(float)-(validationData[:,-1].astype(float) + validationData[:,spreadI].astype(float))))
 validationData = np.column_stack((validationData,np.where(validationData[:,-1].astype(float) > 0,"TRUE","FALSE")))
+print()
 #validationData = validationData[np.abs(validationData[:,-2].astype(float)) > 3]
 right = np.sum(validationData[:,-1] == validationData[:,hwI])
 print(f"right:{right} size:{validationData.shape[0]} %:{right/validationData.shape[0]}")
@@ -200,9 +228,11 @@ for i in range(1,np.max(validationData[:,-2].astype(float)).astype(int)):
     right = np.sum(d[:,-1] == d[:,hwI])
     print(f"right:{right} size:{d.shape[0]} %:{right/d.shape[0]}")
 
+print()
 #run SVM
 validationData = np.column_stack((validationData,svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
 
+print()
 #run LogReg
 validationData = np.column_stack((validationData,logreg(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
 
