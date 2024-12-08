@@ -126,7 +126,34 @@ def svmk(training,validation,headers,flds,c):
 
 def logreg(training,validation,headers,flds,c):
     #needs code filled in
-    return np.full((validationData.shape[0],1),"TRUE")
+    cols = []
+    for fld in flds:
+        cols.append(getFieldIndex(headers, fld))
+    cI = getFieldIndex(headers, c)
+    X = np.column_stack((np.ones((training.shape[0], 1)), training[:, cols])).astype(float)
+    Y = np.where(training[:, cI] == 'TRUE', 1, 0)
+    w = np.zeros(X.shape[1])
+    logisticReg = 0.01
+    epochs = 780
+    
+    for epoch in range(epochs):
+        linear_combination = X @ w
+        predictions = 1 / (1 + np.exp(-linear_combination))
+        error = predictions - Y
+        gradient = X.T @ error / Y.size
+        w -= logisticReg * gradient
+        if epoch % 100 == 0:
+            loss = -np.mean(Y * np.log(predictions) + (1 - Y) * np.log(1 - predictions))
+    validationX = np.column_stack((np.ones((validation.shape[0], 1)), validation[:, cols])).astype(float)
+    #validationY = np.where(validation[:, cI] == 'TRUE', 1, 0)
+    validationZ = validationX @ w
+    predictions = 1 / (1 + np.exp(-validationZ))
+    binPred = np.where(predictions > 0.5, "TRUE", "FALSE")
+    logAccuracy = np.mean(binPred == validation[:, cI])
+    print(f"Logistic Regression: {logAccuracy}")
+    
+    return binPred
+    #return np.full((validationData.shape[0],1),"TRUE")
 
 def linreg(training,validation,headers,flds,c):
     cols = []
