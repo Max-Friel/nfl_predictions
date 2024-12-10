@@ -89,13 +89,13 @@ def svm(training,validation,headers,flds,c):
     a = alpha(X,Y,k)
     w = X.T@diag(Y)@a
     yHat = X@w
-    print("Training")
+    print("SVM Training")
     svmstats(yHat,Y)
     print()
     X = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
     Y = np.where(validation[:,cI] == 'TRUE',1,-1)
     yHat = X@w
-    print("Validation")
+    print("SVM Validation")
     svmstats(yHat,Y)
     return np.where(yHat > 0,"TRUE","FALSE")
 
@@ -114,13 +114,13 @@ def svmk(training,validation,headers,flds,c):
     a = alpha(X,Y,kernel)
     w = X.T@diag(Y)@a
     yHat = kernel(X,X)@diag(Y)@a
-    print("Training")
+    print("SVMK Training")
     svmstats(yHat,Y)
     print()
     X2 = np.column_stack((np.ones((validation.shape[0],1)),validation[:,cols])).astype(float)
     Y2 = np.where(validation[:,cI] == 'TRUE',1,-1)
     yHat = kernel(X2,X)@diag(Y)@a
-    print("Validation")
+    print("SVMK Validation")
     svmstats(yHat,Y2)
     return np.where(yHat > 0,"TRUE","FALSE")
 
@@ -283,7 +283,7 @@ for i in range(1,np.max(validationData[:,-2].astype(float)).astype(int)):
     print(f"right:{right} size:{d.shape[0]} %:{right/d.shape[0]}")
 
 #run SVM
-validationData = np.column_stack((validationData,svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
+validationData = np.column_stack((validationData,svmk(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
 
 print()
 #run LogReg
