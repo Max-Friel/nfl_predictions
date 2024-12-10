@@ -11,7 +11,7 @@ mysql = dbConnect(RMySQL::MySQL(),
                             host='localhost',
                             port=3306,
                             user='root',
-                            password='N!ke6969')
+                            password='Demo1234!')
 
 pbp <- load_pbp(2020:2023)
 pbp$uid <- paste(pbp$game_id,pbp$play_id,sep="_")
