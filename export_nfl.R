@@ -11,9 +11,9 @@ mysql = dbConnect(RMySQL::MySQL(),
                             host='localhost',
                             port=3306,
                             user='root',
-                            password='Demo1234!')
+                            password='N!ke6969')
 
-pbp <- load_pbp(2020:2024)
+pbp <- load_pbp(2020:2023)
 pbp$uid <- paste(pbp$game_id,pbp$play_id,sep="_")
 possession <- select(pbp,week,season,drive_time_of_possession,drive,posteam) %>% group_by(season,week,posteam,drive) %>% summarise(drive_time = max(drive_time_of_possession))
 possession <- filter(possession,!is.na(posteam) & ! is.na(drive))
@@ -23,7 +23,7 @@ possession$sec <- as.numeric(as.character(possession$sec))
 possession$secondsPossessed <- (possession$min * 60) + possession$sec
 possession <- group_by(possession, season,week,posteam) %>% summarize(time = sum(secondsPossessed))
 possession$season_week <- (possession$season * 100) + possession$week
-print(possession)
+
 pbp <- select(pbp,game_id,week,season,uid,yards_gained,td_player_id,interception,penalty,score_differential,fumble_forced,fumble_not_forced,fumble_lost,sack,touchdown,receiver_player_id,passer_player_id,rusher_player_id,interception_player_id,sack_player_id,half_sack_1_player_id,half_sack_2_player_id,penalty_player_id,penalty_yards)
 pbp$season_week <- (pbp$season * 100) + pbp$week
 dbWriteTable(mysql,value = as.data.frame(pbp), name = "pbp", overwrite=TRUE)
@@ -32,7 +32,8 @@ dbWriteTable(mysql,value = as.data.frame(possession), name = "poss", overwrite=T
 teams <- load_teams()
 dbWriteTable(mysql,value = as.data.frame(teams), name = "teams", overwrite=TRUE)
 
-games <- load_schedules(2021:2024)
+games <- load_schedules(2021:2023)
+games <- filter(games,games$game_type == "REG")
 games <- select(games,spread_line,game_id,season,week,gameday,weekday,gametime,away_team,home_team,home_score,away_score,away_rest,home_rest,div_game,roof,surface,temp,wind,stadium_id)
 games$home_roster_id <- paste(games$season,games$week,games$home_team,sep="_") 
 games$away_roster_id <- paste(games$season,games$week,games$away_team,sep="_")
@@ -41,12 +42,13 @@ games$home_win_spread <- games$home_score > (games$away_score + games$spread_lin
 games$season_week <- (games$season * 100) + games$week
 dbWriteTable(mysql,value = as.data.frame(games), name = "games", overwrite=TRUE)
 
-depth <- load_depth_charts(2021:2024)
+depth <- load_depth_charts(2021:2023)
 depth$depth_team <- as.numeric(as.character(depth$depth_team))
 depth$game_id <- paste(depth$season,depth$week,depth$club_code,sep="_")
 dbWriteTable(mysql,value = as.data.frame(depth), name = "depth", overwrite=TRUE)
 
-participation <- load_participation(2020:2024)
+participation <- load_participation(2020:2023)
+participation <- filter(participation,participation$n_offense > 0)
 participation[c('year','week','home','away')] <- str_split_fixed(participation$nflverse_game_id,'_',4)
 participation$year <- as.numeric(as.character(participation$year))
 participation$week <- as.numeric(as.character(participation$week))
@@ -99,7 +101,7 @@ get_query_top <- function(season,week,weeks_back,home_team,away_team){
   print(query)
 }
 
-testGames <- filter(games,season_week <= 202414)
+testGames <- games
 
 #run indexes before running this
 newColumnYear <- list()

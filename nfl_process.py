@@ -155,6 +155,21 @@ def logreg(training,validation,headers,flds,c):
     return binPred
     #return np.full((validationData.shape[0],1),"TRUE")
 
+def linreg2(training,validation):
+    cI = 0
+    X = np.column_stack((np.ones((training.shape[0],1)),training[:,1:])).astype(float)
+    Y = training[:,cI].astype(float)
+    w = np.linalg.pinv(X.T@X)@X.T@Y
+    train = X@w
+    print("Training LinReg:")
+    linregstats(Y,train)
+    X = np.column_stack((np.ones((validation.shape[0],1)),validation[:,1:])).astype(float)
+    Y = validation[:,cI].astype(float)
+    yHat = X@w
+    print("Validation LinReg:")
+    linregstats(Y,yHat)
+    return yHat
+
 def linreg(training,validation,headers,flds,c):
     cols = []
     for fld in flds:
@@ -238,8 +253,20 @@ for fld in zscoreFields:
 #knn(trainingData,validationData,zscoreFields,"home_win_spread",10)
 
 #run LinReg
-validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"home_score")))
-validationData = np.column_stack((validationData,linreg(trainingData,validationData,headers,zscoreFields,"away_score")))
+homeFields = ["home_score","home_rest","pastYear_home_Offense_yards_gained","past4_home_Offense_yards_gained","pastYear_home_Offense_touchdown","past4_home_Offense_touchdown","pastYear_home_Offense_sack","past4_home_Offense_sack","pastYear_home_Offense_penalty_yards","past4_home_Offense_penalty_yards","pastYear_home_Offense_fumble_lost","past4_home_Offense_fumble_lost","pastYear_home_Offense_interception","past4_home_Offense_interception","pastYear_home_Defense_yards_gained","past4_home_Defense_yards_gained","pastYear_home_Defense_touchdown","past4_home_Defense_touchdown","pastYear_home_Defense_sack","past4_home_Defense_sack","pastYear_home_Defense_penalty_yards","past4_home_Defense_penalty_yards","pastYear_home_Defense_fumble_lost","past4_home_Defense_fumble_lost","pastYear_home_Defense_interception","past4_home_Defense_interception","pastYear_home_top","past4_home_top"]
+awayFields = ["away_score","away_rest","pastYear_away_Offense_yards_gained","past4_away_Offense_yards_gained","pastYear_away_Offense_touchdown","past4_away_Offense_touchdown","pastYear_away_Offense_sack","past4_away_Offense_sack","pastYear_away_Offense_penalty_yards","past4_away_Offense_penalty_yards","pastYear_away_Offense_fumble_lost","past4_away_Offense_fumble_lost","pastYear_away_Offense_interception","past4_away_Offense_interception","pastYear_away_Defense_yards_gained","past4_away_Defense_yards_gained","pastYear_away_Defense_touchdown","past4_away_Defense_touchdown","pastYear_away_Defense_sack","past4_away_Defense_sack","pastYear_away_Defense_penalty_yards","past4_away_Defense_penalty_yards","pastYear_away_Defense_fumble_lost","past4_away_Defense_fumble_lost","pastYear_away_Defense_interception","past4_away_Defense_interception","pastYear_away_top","past4_away_top"]
+hcols = []
+for fld in homeFields:
+    hcols.append(getFieldIndex(headers,fld))
+acols = []
+for fld in awayFields:
+    acols.append(getFieldIndex(headers,fld))
+td = np.vstack((trainingData[:,hcols],trainingData[:,acols]))
+vd = np.vstack((validationData[:,hcols],validationData[:,acols]))
+results = linreg2(td,vd)
+halfRes = int(results.shape[0]/2) 
+validationData = np.column_stack((validationData,results[:halfRes]))
+validationData = np.column_stack((validationData,results[halfRes:]))
 hwI = getFieldIndex(headers,"home_win_spread")
 spreadI = getFieldIndex(headers,"spread_line")
 
@@ -255,7 +282,6 @@ for i in range(1,np.max(validationData[:,-2].astype(float)).astype(int)):
     right = np.sum(d[:,-1] == d[:,hwI])
     print(f"right:{right} size:{d.shape[0]} %:{right/d.shape[0]}")
 
-print()
 #run SVM
 validationData = np.column_stack((validationData,svm(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
 
