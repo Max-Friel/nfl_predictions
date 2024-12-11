@@ -26,6 +26,26 @@ def trainingSplit(data):
     validationData = data[(len(data) - trainingIndex):,:]
     return trainingData,validationData
 
+def trainingSplitSFolds(data,n):
+    np.random.shuffle(data)
+    sectionSize = int(len(data)/n)
+    sections = []
+    for i in range(0,n):
+        begin = i*sectionSize
+        end = i*sectionSize + sectionSize
+        if end > len(data):
+            end = len(data)
+        sections.append(data[begin:end,:])
+    ret = []
+    for i in range(0,n):
+        valid = sections[i]
+        train = sections[:i] + sections[i:]
+        t = train[0]
+        for i in range(1,len(train)):
+            t = np.vstack((t,train[i]))
+        ret.append((t,valid))
+    return ret
+
 def rmse(y,yHat):
 	return np.sqrt(np.mean((yHat-y)**2))
 
@@ -102,7 +122,7 @@ def svm(training,validation,headers,flds,c):
 
 
 def kernel(a,b):
-    return ((a@b.T) + 1)**2
+    return ((a@b.T) + 1)**47
 
 def svmk(training,validation,headers,flds,c):
     cols = []
@@ -243,6 +263,7 @@ for fld in oneHotFields:
 
 trainingData, validationData = trainingSplit(data)
 
+#for trainingData,validationData in trainingSplitSFolds(data,5):
 #zscore required fields
 zscoreFields = ["home_rest","away_rest","pastYear_home_Offense_yards_gained","past4_home_Offense_yards_gained","pastYear_home_Offense_touchdown","past4_home_Offense_touchdown","pastYear_home_Offense_sack","past4_home_Offense_sack","pastYear_home_Offense_penalty_yards","past4_home_Offense_penalty_yards","pastYear_home_Offense_fumble_lost","past4_home_Offense_fumble_lost","pastYear_home_Offense_interception","past4_home_Offense_interception","pastYear_home_Defense_yards_gained","past4_home_Defense_yards_gained","pastYear_home_Defense_touchdown","past4_home_Defense_touchdown","pastYear_home_Defense_sack","past4_home_Defense_sack","pastYear_home_Defense_penalty_yards","past4_home_Defense_penalty_yards","pastYear_home_Defense_fumble_lost","past4_home_Defense_fumble_lost","pastYear_home_Defense_interception","past4_home_Defense_interception","pastYear_home_top","past4_home_top","pastYear_away_Offense_yards_gained","past4_away_Offense_yards_gained","pastYear_away_Offense_touchdown","past4_away_Offense_touchdown","pastYear_away_Offense_sack","past4_away_Offense_sack","pastYear_away_Offense_penalty_yards","past4_away_Offense_penalty_yards","pastYear_away_Offense_fumble_lost","past4_away_Offense_fumble_lost","pastYear_away_Offense_interception","past4_away_Offense_interception","pastYear_away_Defense_yards_gained","past4_away_Defense_yards_gained","pastYear_away_Defense_touchdown","past4_away_Defense_touchdown","pastYear_away_Defense_sack","past4_away_Defense_sack","pastYear_away_Defense_penalty_yards","past4_away_Defense_penalty_yards","pastYear_away_Defense_fumble_lost","past4_away_Defense_fumble_lost","pastYear_away_Defense_interception","past4_away_Defense_interception","pastYear_away_top","past4_away_top"]
 for fld in zscoreFields:
