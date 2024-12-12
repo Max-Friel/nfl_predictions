@@ -333,7 +333,7 @@ validationData = np.column_stack((validationData,svmk(trainingData,validationDat
 print()
 #run LogReg
 validationData = np.column_stack((validationData,logreg(trainingData,validationData,headers,zscoreFields,"home_win_spread")))
-
+print()
 #creates a result 2d array where 
 #column 1 is the linear regression result
 #column 2 is the SVM result
@@ -348,6 +348,12 @@ results = np.column_stack((validationData[:,-3:],validationData[:,hwI]))
 bg_results = np.where(results == 'TRUE', 1, 0).astype(int)
 
 X = bg_results[:, :3]  
+voteRes = np.column_stack((results[:, 3] ,np.where(X.sum(axis=1).T > 1.5,"TRUE","FALSE")))
+voteRight = np.sum(voteRes[:,0] == voteRes[:,1])
+print("Voting")
+print(f"Right:{voteRight} Size: {voteRes.shape[0]} Percent:{voteRight/voteRes.shape[0]}")
+print()
+
 y_class = bg_results[:, 3]
 y_reg = bg_results[:, 3].astype(float)
 
