@@ -124,35 +124,63 @@ def svmk(training,validation,headers,flds,c):
     svmstats(yHat,Y2)
     return np.where(yHat > 0,"TRUE","FALSE")
 
-def logreg(training,validation,headers,flds,c):
-    #needs code filled in
-    cols = []
-    for fld in flds:
-        cols.append(getFieldIndex(headers, fld))
-    cI = getFieldIndex(headers, c)
-    X = np.column_stack((np.ones((training.shape[0], 1)), training[:, cols])).astype(float)
-    Y = np.where(training[:, cI] == 'TRUE', 1, 0)
-    w = np.zeros(X.shape[1])
-    logisticReg = 0.01
-    epochs = 780
-    
+def feature_engineering_manual(data, headers, fields):
+    indices = [getFieldIndex(headers, field) for field in fields]
+    selected_features = data[:, indices].astype(float)
+
+    # Add interaction terms
+    interaction_features = []
+    for i in range(selected_features.shape[1]):
+        for j in range(i + 1, selected_features.shape[1]):
+            interaction_features.append((selected_features[:, i] * selected_features[:, j]).reshape(-1, 1))
+
+    interaction_features = np.hstack(interaction_features) if interaction_features else selected_features
+
+    # Scale using z-score normalization
+    scaled_features = []
+    for column in interaction_features.T:
+        mean = np.mean(column)
+        std = np.std(column, ddof=1)
+        scaled_column = (column - mean) / std
+        scaled_features.append(scaled_column.reshape(-1, 1))
+
+    return np.hstack(scaled_features)
+
+def logreg(training, validation, headers, fields, target, learning_rate=0.01, epochs=1000, lambda_=0.1):
+    cols = [getFieldIndex(headers, field) for field in fields]
+    target_col = getFieldIndex(headers, target)
+    X_train = np.column_stack((np.ones((training.shape[0], 1)), training[:, cols].astype(float)))
+    Y_train = np.where(training[:, target_col] == "TRUE", 1, 0)
+    w = np.zeros(X_train.shape[1])
     for epoch in range(epochs):
-        linear_combination = X @ w
+        linear_combination = X_train @ w
         predictions = 1 / (1 + np.exp(-linear_combination))
-        error = predictions - Y
-        gradient = X.T @ error / Y.size
-        w -= logisticReg * gradient
+        error = predictions - Y_train
+        gradient = (X_train.T @ error / Y_train.size) + lambda_ * w
+        w -= learning_rate * gradient
+
         if epoch % 100 == 0:
-            loss = -np.mean(Y * np.log(predictions) + (1 - Y) * np.log(1 - predictions))
-    validationX = np.column_stack((np.ones((validation.shape[0], 1)), validation[:, cols])).astype(float)
-    #validationY = np.where(validation[:, cI] == 'TRUE', 1, 0)
-    validationZ = validationX @ w
-    predictions = 1 / (1 + np.exp(-validationZ))
-    binPred = np.where(predictions > 0.5, "TRUE", "FALSE")
-    logAccuracy = np.mean(binPred == validation[:, cI])
-    print(f"Logistic Regression: {logAccuracy}")
-    
-    return binPred
+            loss = -np.mean(Y_train * np.log(predictions) + (1 - Y_train) * np.log(1 - predictions)) + (lambda_ * np.sum(w**2)) / 2
+            #print(f"Epoch {epoch}: Loss = {loss}")
+    X_val = np.column_stack((np.ones((validation.shape[0], 1)), validation[:, cols].astype(float)))
+    Y_val = np.where(validation[:, target_col] == "TRUE", 1, 0)
+    validation_scores = 1 / (1 + np.exp(-(X_val @ w)))
+    thresholds = np.linspace(0, 1, 100)
+    best_accuracy = 0
+    best_threshold = 0.5
+    for threshold in thresholds:
+        predictions = (validation_scores >= threshold).astype(int)
+        accuracy = np.mean(predictions == Y_val)
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_threshold = threshold
+
+    #print(f"Optimal Threshold: {best_threshold}")
+    predictions = (validation_scores >= best_threshold).astype(int)
+    accuracy = np.mean(predictions == Y_val)
+    print(f"Logistic Regression Validation Accuracy: {accuracy * 100:.2f}%")
+
+    return predictions
     #return np.full((validationData.shape[0],1),"TRUE")
 
 def linreg2(training,validation):
