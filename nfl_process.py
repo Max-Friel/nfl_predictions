@@ -147,16 +147,12 @@ def svmk(training,validation,headers,flds,c):
 def feature_engineering_manual(data, headers, fields):
     indices = [getFieldIndex(headers, field) for field in fields]
     selected_features = data[:, indices].astype(float)
-
-    # Add interaction terms
     interaction_features = []
     for i in range(selected_features.shape[1]):
         for j in range(i + 1, selected_features.shape[1]):
             interaction_features.append((selected_features[:, i] * selected_features[:, j]).reshape(-1, 1))
 
     interaction_features = np.hstack(interaction_features) if interaction_features else selected_features
-
-    # Scale using z-score normalization
     scaled_features = []
     for column in interaction_features.T:
         mean = np.mean(column)
